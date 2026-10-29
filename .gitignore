@@ -50,6 +50,7 @@ coverage.xml
 *.lcov
 .hypothesis/
 .pytest_cache/
+pytest-cache-files-*/
 cover/
 
 # Translations
@@ -218,3 +219,20 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# JobHunter local configuration, frontend and private inputs
+.env.*
+!.env.example
+node_modules/
+*.tsbuildinfo
+frontend/coverage/
+playwright-report/
+test-results/
+.local/
+private/
+data/
+uploads/
+*.dump
+*.sql.gz
+*.pem
+*.key

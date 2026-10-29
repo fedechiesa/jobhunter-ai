@@ -1,0 +1,38 @@
+name: jobhunter-ai
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Run python scripts/setup_env.py first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run python scripts/setup_env.py first}
+      POSTGRES_DB: ${POSTGRES_DB:?Run python scripts/setup_env.py first}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+      start_period: 5s
+    restart: unless-stopped
+  db-test:
+    image: postgres:17-alpine
+    profiles: [test]
+    environment:
+      POSTGRES_USER: jobhunter_test
+      POSTGRES_PASSWORD: ${TEST_POSTGRES_PASSWORD:?Run python scripts/setup_env.py first}
+      POSTGRES_DB: jobhunter_test
+    ports:
+      - "127.0.0.1:${TEST_POSTGRES_PORT:-5433}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: "no"
+volumes:
+  postgres_data:
