@@ -8,19 +8,23 @@
 - Dashboard React con formularios, paginación, scores, carga, vacío y error.
 - Tests backend/frontend, Ruff, TypeScript strict y build.
 
-## Sprint 2 — Organización y calidad de datos (propuesto; sin implementar)
+## Sprint 2 — Job Discovery Engine (implementado)
 
-- Editar/archivar ofertas, filtrar y buscar.
-- Estados de seguimiento personal, sin envío de postulaciones.
-- Deduplicación e importación de archivos aportados por el usuario.
-- Metadatos de autorización y procedencia antes de integrar fuentes externas.
-- Evaluar el matching con ejemplos sintéticos y feedback explícito.
+- Lectura de Greenhouse Job Board API, Lever Postings API y Ashby Job Postings API por tablero configurado.
+- Normalización, referencias externas únicas, detección conservadora de alias e historial de disponibilidad.
+- Intereses de búsqueda editables separados del perfil y matching determinista reutilizado.
+- Filtros, modalidades, enlaces originales, fechas y estado por fuente en el dashboard.
+- Sincronización manual y worker periódico con lock PostgreSQL, logs JSON, timeouts y reintentos.
+- Tests con respuestas simuladas, migración preservando Sprint 1 y lecturas reales controladas.
+- Sprint 1 publicado en `9a92362`; CI remota aprobada. Cierre del Sprint 2 con muestreo de 14 registros y correcciones de Talent Pool, años explícitos y ubicaciones alternativas; ver `SPRINT_2_RELEASE_VALIDATION.md`.
 
-## Fase 3 — Fuentes autorizadas
+## Sprint 3 — Cobertura y precisión (solo propuesto; sin implementar)
 
-- APIs oficiales, feeds o integraciones permitidas, respetando términos y cuotas.
-- Adaptadores por fuente, trazabilidad, reintentos y observabilidad.
-- Sin automatización de LinkedIn/Indeed ni elusión de CAPTCHA o acceso.
+- Seleccionar más tableros autorizados con evidencia de cobertura Argentina/junior.
+- Revisar precisión de extracción de requisitos y restricciones geográficas, conservando incertidumbre.
+- Mejorar deduplicación solo con evidencia, evaluación y trazabilidad.
+- Evaluar edición/archivo de ofertas y seguimiento personal de candidaturas, sin envío.
+- Mantener exclusión de LinkedIn/Indeed, scraping y elusión de controles.
 
 ## Fase 4 — Asistencia de candidatura
 

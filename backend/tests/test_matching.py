@@ -46,3 +46,22 @@ def test_score_capped_and_order_independent(job_payload):
     result = calculate_match(profile, JobCreate(**job_payload))
     assert result.score == 100
     assert result.matched_skills == ["python", "sql"]
+
+
+@pytest.mark.parametrize(
+    ("advertised", "preference", "expected"),
+    [
+        ("Montevideo / Buenos Aires / Sao Paulo", "Buenos Aires", 100),
+        ("Montevideo (Hybrid) / Buenos Aires", "Montevideo", 100),
+        ("  Buenos   Aires (Hybrid) ", " buenos aires ", 100),
+        ("Buenos Aires / Montevideo", "Argentina", 0),
+        ("Buenos Aires / Montevideo", "Aires", 0),
+    ],
+)
+def test_matching_compares_explicit_location_alternatives(
+    job_payload, advertised, preference, expected
+):
+    job = JobCreate(**(job_payload | {"location": advertised, "remote": False}))
+    result = calculate_match(ProfileInput(preferred_location=preference, prefer_remote=False), job)
+    assert result.location_score == expected
+    assert result.algorithm_version == "deterministic-v1.1"

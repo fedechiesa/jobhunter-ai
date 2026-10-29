@@ -1,6 +1,6 @@
 # Validación del Sprint 1
 
-Ejecutada el **29 de octubre de 2026** en Windows, Python 3.12.10, Node 24.22.2 portable y Docker Desktop con motor Linux. No se hizo push ni se ejecutó el Sprint 2.
+Validación inicial ejecutada el **29 de octubre de 2026** en Windows, Python 3.12.10, Node 24.22.2 portable y Docker Desktop con motor Linux. Este documento conserva la evidencia del Sprint 1; las validaciones nuevas están en `SPRINT_2_VALIDATION.md`.
 
 | Control | Resultado |
 | --- | --- |
@@ -38,6 +38,6 @@ Vite respondió HTTP 200 para el HTML y el módulo cliente de API. Se verificó 
 
 No se completó la inspección visual ni un flujo extremo a extremo en navegador real: el host de Browser Use no estaba disponible y el acceso alternativo a Chrome mediante computer-use agotó la espera de autorización. Los tests de interfaz se ejecutaron en jsdom; no sustituyen una revisión visual de escritorio/móvil.
 
-Se configuró GitHub Actions para repetir los controles en Linux, pero el workflow remoto no se ejecutó durante esta sesión. No se validó un despliegue público: está fuera del alcance y la aplicación carece de autenticación.
+En el cierre posterior solicitado por el usuario se volvieron a ejecutar los 40 tests backend y 14 frontend, lint, typecheck y build. Se publicó el commit [`9a92362`](https://github.com/fedechiesa/jobhunter-ai/commit/9a92362a70fb0774776922d7bdeca1ff51cf4392) en `origin/main`, después de comprobar que coincidía con la rama remota y revisar secretos. [GitHub Actions completó correctamente](https://github.com/fedechiesa/jobhunter-ai/actions/runs/40949892356). No se validó un despliegue público: está fuera del alcance y la aplicación carece de autenticación.
 
 Se corrigieron las vulnerabilidades inicialmente reportadas por npm actualizando Vite/Vitest y usando Node 24 LTS, sin modificar el Node global instalado. Los comandos reproducibles y los requisitos están en el README.

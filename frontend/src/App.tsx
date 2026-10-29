@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { api, PAGE_SIZE } from './api';
 import { JobForm, ProfileForm } from './components/Forms';
 import { JobCard } from './components/JobCard';
-import type { Job, JobInput, Profile, ProfileInput } from './types';
+import { DiscoveryPanel } from './components/DiscoveryPanel';
+import { JobFilters } from './components/JobFilters';
+import type { Job, JobFilters as Filters, JobInput, Profile, ProfileInput } from './types';
 
 export default function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -16,13 +18,14 @@ export default function App() {
   const [matchingId, setMatchingId] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [refresh, setRefresh] = useState(0);
+  const [filters, setFilters] = useState<Filters>({ sort: 'priority', availability: 'active' });
 
   useEffect(() => {
     let active = true;
     setLoading(true);
     setLoadFailed(false);
     setError('');
-    Promise.all([api.jobs(page), api.profile()])
+    Promise.all([api.jobs(page, filters), api.profile()])
       .then(([offers, candidate]) => {
         if (active) {
           setJobs(offers);
@@ -41,7 +44,7 @@ export default function App() {
     return () => {
       active = false;
     };
-  }, [page, refresh]);
+  }, [page, refresh, filters]);
 
   async function mutate(action: () => Promise<void>) {
     setBusy(true);
@@ -70,8 +73,9 @@ export default function App() {
   async function saveJob(data: JobInput) {
     await mutate(async () => {
       const saved = await api.createJob(data);
-      if (page === 0) setJobs((current) => [saved, ...current].slice(0, PAGE_SIZE));
-      else setPage(0);
+      setJobs((current) => [saved, ...current].slice(0, PAGE_SIZE));
+      setPage(0);
+      setRefresh((value) => value + 1);
       setEditor(null);
       setNotice('Oferta guardada. Tu próxima oportunidad ya está en el tablero.');
     });
@@ -144,6 +148,12 @@ export default function App() {
             <strong>{ready && average !== null ? `${average}%` : '—'}</strong>
           </div>
         </div>
+        <DiscoveryPanel
+          onRefresh={() => {
+            setPage(0);
+            setRefresh((value) => value + 1);
+          }}
+        />
         <section className="workspace" aria-labelledby="opportunities-title">
           <div className="section-heading">
             <div>
@@ -190,6 +200,13 @@ export default function App() {
             <ProfileForm profile={profile} busy={busy || loading} onSave={saveProfile} />
           )}
           {editor === 'job' && <JobForm busy={busy || loading} onSave={saveJob} />}
+          <JobFilters
+            disabled={busy || loading}
+            onApply={(next) => {
+              setPage(0);
+              setFilters(next);
+            }}
+          />
           {loading ? (
             <div className="empty-state" role="status">
               <span className="loader" />
@@ -232,7 +249,7 @@ export default function App() {
                     <p>
                       {page
                         ? 'No hay más ofertas para mostrar en esta página.'
-                        : 'Todavía no hay ofertas. Agregá la primera y empezá a explorar cómo encaja con tu perfil.'}
+                        : 'No hay ofertas para estos filtros. Sincronizá las fuentes, cambiá la búsqueda o agregá una oferta manual.'}
                     </p>
                     {!page && (
                       <button className="primary" disabled={busy} onClick={() => setEditor('job')}>
@@ -264,7 +281,7 @@ export default function App() {
         </section>
         <footer>
           <span>
-            JobHunter AI <span className="footer-dot">/</span> Foundation
+            JobHunter AI <span className="footer-dot">/</span> Discovery Engine
           </span>
           <span>Matching por reglas · 100% local</span>
         </footer>

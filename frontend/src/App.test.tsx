@@ -15,6 +15,7 @@ vi.mock('./api', () => ({
     match: vi.fn(),
   },
 }));
+vi.mock('./components/DiscoveryPanel', () => ({ DiscoveryPanel: () => null }));
 
 const profile: Profile = {
   id: 1,
@@ -124,7 +125,10 @@ describe('dashboard', () => {
   });
 
   it('creates a manual job from the form', async () => {
-    vi.mocked(api.createJob).mockResolvedValue(job);
+    vi.mocked(api.createJob).mockImplementation(async () => {
+      vi.mocked(api.jobs).mockResolvedValue([job]);
+      return job;
+    });
     render(<App />);
     await screen.findByText('Un tablero lleno de posibilidades');
     await userEvent.click(screen.getByRole('button', { name: '+ Agregar oferta' }));
@@ -149,7 +153,9 @@ describe('dashboard', () => {
       within(screen.getByRole('navigation')).getByRole('button', { name: 'Siguiente →' }),
     );
     expect(await screen.findByText('Llegaste al final')).toBeInTheDocument();
-    await waitFor(() => expect(api.jobs).toHaveBeenLastCalledWith(1));
+    await waitFor(() =>
+      expect(api.jobs).toHaveBeenLastCalledWith(1, { sort: 'priority', availability: 'active' }),
+    );
     expect(screen.getByRole('button', { name: 'Siguiente →' })).toBeDisabled();
   });
 

@@ -10,9 +10,29 @@ interface Props {
 
 export function JobCard({ job, busy, matching, hasProfile, onMatch }: Props) {
   const score = job.match_score;
+  const mode: Record<string, string> = {
+    remote: 'Remoto',
+    hybrid: 'Híbrido',
+    onsite: 'Presencial',
+    unknown: 'Modalidad sin especificar',
+  };
   return (
     <article className="job-card">
       <div className="job-main">
+        <div className="discovery-meta">
+          <span>{job.provider ?? 'manual'}</span>
+          {job.first_discovered_at && (
+            <span>
+              Descubierta: {new Date(job.first_discovered_at).toLocaleDateString('es-AR')}
+            </span>
+          )}
+          {job.availability === 'potentially_inactive' && (
+            <span className="availability-warning">Potencialmente inactiva</span>
+          )}
+          {job.search_priority !== undefined && (
+            <span>Prioridad de búsqueda: {job.search_priority.toFixed(0)}/100</span>
+          )}
+        </div>
         <div className="job-heading">
           <span className="company-mark" aria-hidden="true">
             {job.company.charAt(0).toUpperCase()}
@@ -23,11 +43,17 @@ export function JobCard({ job, busy, matching, hasProfile, onMatch }: Props) {
           </div>
         </div>
         <p className="job-meta">
-          {job.remote ? 'Remoto' : 'Presencial / sin especificar'}
+          {job.workplace_type
+            ? (mode[job.workplace_type] ?? job.workplace_type)
+            : job.remote
+              ? 'Remoto'
+              : 'Presencial / sin especificar'}
           <span>·</span>
           {job.location || 'Ubicación no especificada'}
           <span>·</span>
-          {job.experience_years} años de experiencia
+          {job.experience_years_known === false
+            ? 'Experiencia sin precisar'
+            : `${job.experience_years} años de experiencia`}
         </p>
         <p className="job-description">{job.description}</p>
         <div className="tags">
@@ -35,9 +61,26 @@ export function JobCard({ job, busy, matching, hasProfile, onMatch }: Props) {
             <span key={skill}>{skill}</span>
           ))}
         </div>
+        {job.requirements_inferred && (
+          <p className="inferred-note">
+            Tecnologías detectadas en el texto; pueden incluir menciones opcionales. Revisá los
+            requisitos y las restricciones geográficas en la publicación original.
+          </p>
+        )}
         {job.url && (
           <a className="source-link" href={job.url} target="_blank" rel="noopener noreferrer">
             Ver publicación original ↗
+          </a>
+        )}
+        {job.apply_url && job.apply_url !== job.url && (
+          <a
+            className="source-link"
+            style={{ marginLeft: 14 }}
+            href={job.apply_url}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Ir al sitio para postular ↗
           </a>
         )}
       </div>

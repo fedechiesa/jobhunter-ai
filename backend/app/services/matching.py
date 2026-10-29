@@ -1,4 +1,22 @@
+import re
+
 from app.schemas import JobCreate, MatchResult, ProfileInput
+
+
+def location_matches(preference: str, advertised: str) -> bool:
+    def normalized(value: str) -> str:
+        value = re.sub(
+            r"\s*\((?:hybrid|remote|onsite|híbrido|remoto|presencial)\)\s*",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+        return " ".join(value.casefold().split())
+
+    expected = normalized(preference)
+    return expected == normalized(advertised) or expected in {
+        normalized(location) for location in re.split(r"[/;|\n]", advertised)
+    }
 
 
 def calculate_match(profile: ProfileInput, job: JobCreate) -> MatchResult:
@@ -15,7 +33,7 @@ def calculate_match(profile: ProfileInput, job: JobCreate) -> MatchResult:
     location_ok = (
         not profile.preferred_location
         or (profile.prefer_remote and job.remote)
-        or profile.preferred_location.casefold() == job.location.casefold()
+        or location_matches(profile.preferred_location, job.location)
     )
     location_score = 100.0 if location_ok else 0.0
     return MatchResult(

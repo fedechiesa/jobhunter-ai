@@ -221,6 +221,7 @@ __marimo__/
 .streamlit/secrets.toml
 
 # JobHunter local configuration, frontend and private inputs
+.vscode/
 .env.*
 !.env.example
 node_modules/

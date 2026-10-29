@@ -66,7 +66,13 @@ def test_profile_match_persistence_and_invalidation(db_client, db_session, job_p
 
 
 def test_migration_revision(db_session):
-    assert db_session.scalar(text("SELECT version_num FROM alembic_version")) == "0001_foundation"
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    from app.core.config import ROOT
+
+    head = ScriptDirectory.from_config(Config(str(ROOT / "backend/alembic.ini"))).get_current_head()
+    assert db_session.scalar(text("SELECT version_num FROM alembic_version")) == head
 
 
 def test_committed_data_survives_new_connection(migrated_engine, job_payload):

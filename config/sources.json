@@ -1,0 +1,5 @@
+[
+  {"provider": "greenhouse", "board_token": "canonical", "company": "Canonical", "region": "global", "enabled": true},
+  {"provider": "lever", "board_token": "dlocal", "company": "dLocal", "region": "global", "enabled": true},
+  {"provider": "ashby", "board_token": "Ashby", "company": "Ashby", "region": "global", "enabled": true}
+]

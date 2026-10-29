@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.api import health, jobs, profile
+from app.api import discovery, health, jobs, profile
 from app.core.config import Settings, get_settings
 
 
@@ -13,7 +13,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.add_middleware(
         CORSMiddleware,
         allow_origins=config.cors_origins,
-        allow_methods=["GET", "POST", "PUT"],
+        allow_methods=["GET", "POST", "PUT", "PATCH"],
         allow_headers=["Content-Type"],
     )
 
@@ -25,4 +25,5 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(health.router)
     application.include_router(jobs.router)
     application.include_router(profile.router)
+    application.include_router(discovery.router)
     return application

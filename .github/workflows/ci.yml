@@ -1,4 +1,4 @@
-name: Sprint 1 checks
+name: JobHunter checks
 on:
   push:
   pull_request:

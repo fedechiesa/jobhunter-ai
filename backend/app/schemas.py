@@ -54,7 +54,7 @@ class MatchResult(BaseModel):
     location_score: float
     matched_skills: list[str]
     missing_skills: list[str]
-    algorithm_version: str = "deterministic-v1"
+    algorithm_version: str = "deterministic-v1.1"
 
 
 class MatchRead(MatchResult):
@@ -79,3 +79,17 @@ class JobRead(BaseModel):
     source_id: int
     created_at: datetime
     match_score: MatchRead | None
+    provider: str
+    external_id: str | None
+    apply_url: str | None
+    published_at: datetime | None
+    first_discovered_at: datetime
+    last_seen_at: datetime
+    availability: str
+    discovery_status: str
+    workplace_type: str
+    duplicate_of_id: int | None
+    search_priority: float
+    seniority: str
+    requirements_inferred: bool
+    experience_years_known: bool

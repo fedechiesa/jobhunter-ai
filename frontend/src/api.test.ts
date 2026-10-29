@@ -4,6 +4,20 @@ import { api } from './api';
 afterEach(() => vi.unstubAllGlobals());
 
 describe('API client', () => {
+  it('encodes filters without changing pagination', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => [] });
+    vi.stubGlobal('fetch', fetchMock);
+    await api.jobs(2, { q: 'Python & SQL', provider: 'greenhouse', min_score: '0' });
+    const url = new URL(fetchMock.mock.calls[0][0] as string);
+    expect(url.searchParams.get('q')).toBe('Python & SQL');
+    expect(url.searchParams.get('offset')).toBe('40');
+    expect(url.searchParams.get('min_score')).toBe('0');
+  });
+
+  it('distinguishes concurrent synchronization from a missing profile', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 409 }));
+    await expect(api.sync()).rejects.toThrow('Ya hay una sincronización en curso');
+  });
   it('treats a missing profile as the first-run state', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 404 }));
     await expect(api.profile()).resolves.toBeNull();
