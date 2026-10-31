@@ -11,7 +11,8 @@ from app.discovery.configuration import ensure_sources, search_preferences
 from app.discovery.normalization import priority
 from app.discovery.schemas import SearchInput, SourceRead, SourceUpdate, SyncRead
 from app.discovery.sync import SyncBusy, is_running, synchronize
-from app.models import JobPosting, JobSource, SearchPreferences, SyncRun
+from app.models import CandidateProfile, JobPosting, JobSource, SearchPreferences, SyncRun
+from app.services.classification import classify_job
 
 router = APIRouter(tags=["discovery"])
 Database = Annotated[Session, Depends(get_session)]
@@ -53,6 +54,9 @@ def update_search_preferences(payload: SearchInput, session: Database):
     else:
         for key, value in payload.model_dump().items():
             setattr(stored, key, value)
+    profile = session.scalar(
+        select(CandidateProfile).where(CandidateProfile.id == 1).with_for_update()
+    )
     for job in session.scalars(select(JobPosting)):
         job.search_priority, job.seniority = priority(
             job.title,
@@ -62,6 +66,7 @@ def update_search_preferences(payload: SearchInput, session: Database):
             job.experience_years_known,
             payload,
         )
+        classify_job(job, profile)
     session.commit()
     return payload
 

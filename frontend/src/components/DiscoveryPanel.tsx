@@ -13,7 +13,13 @@ const statusLabel: Record<string, string> = {
   running: 'En curso',
 };
 
-export function DiscoveryPanel({ onRefresh }: { onRefresh: () => void }) {
+export function DiscoveryPanel({
+  onRefresh,
+  onSources,
+}: {
+  onRefresh: () => void;
+  onSources?: (sources: Source[]) => void;
+}) {
   const [sources, setSources] = useState<Source[]>([]);
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [preferences, setPreferences] = useState<SearchPreferences | null>(null);
@@ -24,6 +30,11 @@ export function DiscoveryPanel({ onRefresh }: { onRefresh: () => void }) {
   const [expanded, setExpanded] = useState(false);
   const refreshRef = useRef(onRefresh);
   refreshRef.current = onRefresh;
+  const sourcesRef = useRef(onSources);
+  sourcesRef.current = onSources;
+  useEffect(() => {
+    sourcesRef.current?.(sources);
+  }, [sources]);
   const latestRef = useRef<number | null>(null);
   const initializedRef = useRef(false);
 
@@ -73,8 +84,11 @@ export function DiscoveryPanel({ onRefresh }: { onRefresh: () => void }) {
       setStatus({ running: false, latest: result });
       setSources(await api.sources());
       const total = result.source_results.reduce((sum, source) => sum + (source.fetched ?? 0), 0);
+      const deferred = result.source_results.filter(
+        (source) => source.status === 'deferred',
+      ).length;
       setMessage(
-        `${statusLabel[result.status] ?? result.status}. ${total} ofertas leídas en esta ejecución.`,
+        `${statusLabel[result.status] ?? result.status}. ${total} ofertas leídas en esta ejecución.${deferred ? ` ${deferred} fuentes diferidas por espera de control.` : ''}`,
       );
       refreshRef.current();
     } catch (reason) {
@@ -167,6 +181,10 @@ export function DiscoveryPanel({ onRefresh }: { onRefresh: () => void }) {
           <div className="source-row" key={source.id}>
             <div>
               <strong>{source.name}</strong>
+              <span> · Fuente #{source.id}</span>
+              {source.next_allowed_at && (
+                <p>Próxima lectura permitida: {dateLabel(source.next_allowed_at)}</p>
+              )}
               <p>
                 {source.last_error
                   ? `Error: ${source.last_error}`

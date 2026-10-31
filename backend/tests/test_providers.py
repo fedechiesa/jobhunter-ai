@@ -14,6 +14,43 @@ def provider_settings():
     return Settings(_env_file=None, database_url="postgresql+psycopg://unused@localhost/unused")
 
 
+@pytest.mark.parametrize("header", ["NaN", "Infinity", "-1"])
+def test_malformed_retry_delay_cannot_crash_sync_or_trigger_busy_retries(provider_settings, header):
+    calls = []
+
+    def respond(request):
+        calls.append(request)
+        return httpx2.Response(429, headers={"Retry-After": header})
+
+    reader = JsonReader(provider_settings, httpx2.MockTransport(respond), sleep=lambda _: None)
+    with pytest.raises(ProviderError, match="retry_later") as caught:
+        reader.get("https://example.com")
+    assert len(calls) == 1 and caught.value.retry_after_seconds == 3600
+
+
+def test_ashby_preserves_structured_country_and_secondary_locations(
+    provider_settings, public_responses
+):
+    row = public_responses["ashby"]["jobs"][0]
+    row["location"] = "Remote " + "x" * 220
+    row["address"] = {"postalAddress": {"addressCountry": "AR"}}
+    row["secondaryLocations"] = [{"location": "Buenos Aires", "address": {"addressCountry": "ARG"}}]
+    provider = PublicBoardProvider("ashby", JsonReader(provider_settings))
+    result = provider.normalize(row)
+    assert len(result.location) == 200
+    assert "Argentina" in result.location_details and "Buenos Aires" in result.location_details
+    assert result.workplace_confirmed
+
+
+def test_verified_boards_configuration(provider_settings):
+    from app.discovery.configuration import configured_boards
+
+    boards = configured_boards(provider_settings)
+    assert {("greenhouse", "sezzle"), ("lever", "despegar"), ("ashby", "silver")} <= {
+        (b.provider, b.board_token) for b in boards
+    }
+
+
 @pytest.fixture
 def public_responses():
     greenhouse = {

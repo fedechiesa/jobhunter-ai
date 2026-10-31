@@ -4,7 +4,7 @@ import { JobForm, ProfileForm } from './components/Forms';
 import { JobCard } from './components/JobCard';
 import { DiscoveryPanel } from './components/DiscoveryPanel';
 import { JobFilters } from './components/JobFilters';
-import type { Job, JobFilters as Filters, JobInput, Profile, ProfileInput } from './types';
+import type { Job, JobFilters as Filters, JobInput, Profile, ProfileInput, Source } from './types';
 
 export default function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -18,7 +18,8 @@ export default function App() {
   const [matchingId, setMatchingId] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [refresh, setRefresh] = useState(0);
-  const [filters, setFilters] = useState<Filters>({ sort: 'priority', availability: 'active' });
+  const [sources, setSources] = useState<Source[]>([]);
+  const [filters, setFilters] = useState<Filters>({ sort: 'recommended', availability: 'active' });
 
   useEffect(() => {
     let active = true;
@@ -67,6 +68,8 @@ export default function App() {
       setJobs((current) => current.map((job) => ({ ...job, match_score: null })));
       setEditor(null);
       setNotice('Perfil guardado. Podés calcular la compatibilidad de tus ofertas.');
+      setPage(0);
+      setRefresh((value) => value + 1);
     });
   }
 
@@ -149,6 +152,7 @@ export default function App() {
           </div>
         </div>
         <DiscoveryPanel
+          onSources={setSources}
           onRefresh={() => {
             setPage(0);
             setRefresh((value) => value + 1);
@@ -201,6 +205,7 @@ export default function App() {
           )}
           {editor === 'job' && <JobForm busy={busy || loading} onSave={saveJob} />}
           <JobFilters
+            sources={sources}
             disabled={busy || loading}
             onApply={(next) => {
               setPage(0);

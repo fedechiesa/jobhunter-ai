@@ -2,12 +2,13 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import or_, select
+from sqlalchemy import case, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import CandidateProfile, JobPosting, JobSource, MatchScore
 from app.schemas import JobCreate, JobRead, MatchRead
+from app.services.classification import classify_job
 from app.services.scores import persist_match
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
@@ -35,10 +36,36 @@ def list_jobs(
     published_after: datetime | None = None,
     min_score: Annotated[float | None, Query(ge=0, le=100)] = None,
     min_priority: Annotated[float | None, Query(ge=0, le=100)] = None,
-    sort: Literal["newest", "priority", "score"] = "newest",
+    country: Literal["AR", "other", "unknown"] | None = None,
+    seniority: Literal["junior", "senior", "unknown"] | None = None,
+    compatibility: Literal[
+        "argentina_priority", "international_alternative", "review_needed", "deprioritized"
+    ]
+    | None = None,
+    source_id: Annotated[int | None, Query(ge=1)] = None,
+    sort: Literal["newest", "priority", "score", "recommended"] = "newest",
     include_duplicates: bool = False,
 ) -> list[JobPosting]:
     statement = select(JobPosting)
+    for field, value in (
+        (JobPosting.country, country),
+        (JobPosting.seniority, seniority),
+        (JobPosting.compatibility, compatibility),
+        (JobPosting.source_id, source_id),
+    ):
+        if value is not None:
+            statement = statement.where(field == value)
+    if sort == "recommended":
+        statement = statement.order_by(
+            case(
+                (JobPosting.compatibility == "argentina_priority", 0),
+                (JobPosting.compatibility == "international_alternative", 1),
+                (JobPosting.compatibility == "review_needed", 2),
+                else_=3,
+            ),
+            JobPosting.assessment["language_preferred"].as_boolean().desc().nulls_last(),
+            JobPosting.search_priority.desc(),
+        )
     if q:
         statement = statement.where(
             or_(
@@ -82,6 +109,7 @@ def create_job(payload: JobCreate, session: Database) -> JobPosting:
         raise HTTPException(status_code=422, detail="Unknown job source")
     job = JobPosting(**payload.model_dump(mode="json"))
     job.workplace_type = "remote" if payload.remote else "unknown"
+    classify_job(job, session.get(CandidateProfile, 1))
     session.add(job)
     session.commit()
     session.refresh(job)

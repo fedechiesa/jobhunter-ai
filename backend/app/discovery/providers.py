@@ -1,6 +1,9 @@
 import json
+import math
 import time
 from collections.abc import Callable
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 from typing import Protocol
 
 import httpx2
@@ -13,6 +16,10 @@ from app.discovery.schemas import BoardConfig, NormalizedJob
 
 class ProviderError(Exception):
     """Safe error code; never includes response bodies or connection details."""
+
+    def __init__(self, code: str, retry_after_seconds: float = 0):
+        super().__init__(code)
+        self.retry_after_seconds = retry_after_seconds
 
 
 class JobProvider(Protocol):
@@ -53,9 +60,23 @@ class JsonReader:
                     delay = float(retry_after) if retry_after else 2**attempt
                 except ValueError:
                     # An HTTP-date must not be ignored; defer to the next scheduled run.
-                    raise ProviderError("retry_later") from None
+                    try:
+                        delay = max(
+                            0,
+                            (
+                                parsedate_to_datetime(retry_after).astimezone(UTC)
+                                - datetime.now(UTC)
+                            ).total_seconds(),
+                        )
+                    except (TypeError, ValueError, OverflowError):
+                        delay = 3600
+                    raise ProviderError("retry_later", delay) from None
+                if not math.isfinite(delay) or delay < 0:
+                    raise ProviderError("retry_later", 3600)
+                if delay > 31_536_000:
+                    raise ProviderError("retry_after_out_of_range")
                 if delay > 10 or attempt + 1 == self.settings.provider_max_attempts:
-                    raise ProviderError(f"http_{response.status_code}")
+                    raise ProviderError(f"http_{response.status_code}", max(delay, 0))
                 self.sleep(max(delay, 0))
                 continue
             if response.status_code != 200:
@@ -135,6 +156,7 @@ class PublicBoardProvider:
                 title=row["title"],
                 description=plain_text(row["content"]),
                 location=location[:200],
+                location_details=location,
                 workplace_type=modality(None, location),
                 url=row["absolute_url"],
                 apply_url=row["absolute_url"],
@@ -155,6 +177,9 @@ class PublicBoardProvider:
                 title=row["text"],
                 description=description,
                 location=location[:200],
+                location_details=location,
+                workplace_confirmed=row.get("workplaceType")
+                in {"remote", "hybrid", "on-site", "onsite"},
                 workplace_type=modality(row.get("workplaceType"), location),
                 url=row["hostedUrl"],
                 apply_url=row["applyUrl"],
@@ -164,12 +189,28 @@ class PublicBoardProvider:
             [row["location"], *[item["location"] for item in row.get("secondaryLocations", [])]]
         )
         original = row["jobUrl"]
+        address = row.get("address", {}) or {}
+        primary_country = (address.get("postalAddress", {}) or {}).get("addressCountry", "")
+        countries = [
+            primary_country,
+            *[
+                (item.get("address", {}) or {}).get("addressCountry", "")
+                for item in row.get("secondaryLocations", [])
+            ],
+        ]
+        countries = [
+            "Argentina" if country in {"AR", "ARG"} else country for country in countries if country
+        ]
         # Ashby's documented feed may omit id. The stable hosted URL is then the external reference.
         return NormalizedJob(
             external_id=str(row.get("id") or original.rstrip("/").rsplit("/", 1)[-1]),
             title=row["title"],
             description=row.get("descriptionPlain") or plain_text(row["descriptionHtml"]),
             location=location[:200],
+            location_details=" / ".join([location, *countries]),
+            workplace_confirmed=row.get("workplaceType")
+            in {"remote", "hybrid", "on-site", "onsite"}
+            or row.get("isRemote") is True,
             workplace_type=modality(
                 row.get("workplaceType") or ("remote" if row.get("isRemote") else None), location
             ),

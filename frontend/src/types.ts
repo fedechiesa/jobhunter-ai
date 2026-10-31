@@ -3,6 +3,43 @@ export interface ProfileInput {
   experience_years: number;
   preferred_location: string;
   prefer_remote: boolean;
+  professional?: ProfessionalDetails | null;
+}
+
+export type Confirmation = 'pending' | 'user_confirmed';
+export interface ProfessionalDetails {
+  schema_version: 1;
+  origin: 'user_declared' | 'local_cv';
+  skills: Array<{ name: string; confirmation: Confirmation; details?: string }>;
+  education: Array<{
+    title: string;
+    institution: string;
+    status: 'completed' | 'in_progress' | 'unknown';
+    confirmation: Confirmation;
+  }>;
+  work_experience: Array<{
+    role: string;
+    details: string;
+    is_it: boolean;
+    paid: boolean | null;
+    confirmation: Confirmation;
+  }>;
+  projects: Array<{
+    name: string;
+    description: string;
+    technologies: string[];
+    confirmation: Confirmation;
+  }>;
+  languages: Array<{
+    name: string;
+    level: 'unknown' | 'basic' | 'intermediate' | 'advanced' | 'fluent' | 'native';
+    confirmation: Confirmation;
+  }>;
+  target_roles: string[];
+  residence_country: string;
+  preferred_languages: Array<'es' | 'en'>;
+  first_it_job: boolean;
+  max_experience_years: number;
 }
 
 export interface Profile extends ProfileInput {
@@ -52,6 +89,24 @@ export interface Job extends JobInput {
   seniority?: string;
   requirements_inferred?: boolean;
   experience_years_known?: boolean;
+  country?: string;
+  compatibility?: string;
+  assessment?: {
+    hard_requirements?: Evidence[];
+    reasons: string[];
+    geography: Evidence;
+    seniority: Evidence;
+    language: Evidence;
+    experience: Evidence;
+    posting_language: Evidence;
+    workplace: Evidence;
+  };
+}
+
+export interface Evidence {
+  value: string | number | null;
+  status: string;
+  evidence: string;
 }
 
 export interface JobFilters {
@@ -63,6 +118,11 @@ export interface JobFilters {
   discovered_after?: string;
   min_score?: string;
   sort?: string;
+  country?: string;
+  seniority?: string;
+  compatibility?: string;
+  published_after?: string;
+  source_id?: string;
 }
 
 export interface Source {
@@ -76,6 +136,8 @@ export interface Source {
   last_success_at: string | null;
   last_error: string | null;
   last_result: Record<string, number | string> | null;
+  next_allowed_at?: string | null;
+  consecutive_failures?: number;
 }
 
 export interface SearchPreferences {

@@ -13,11 +13,12 @@ def persist_match(session: Session, profile: CandidateProfile, job: JobPosting) 
             title=job.title,
             company=job.company,
             description=job.description[:20000],
-            location=job.location,
+            location=(job.location_details or job.location)[:200],
             remote=job.remote,
             required_skills=job.required_skills,
             experience_years=job.experience_years,
         ),
+        geography=(job.assessment or {}).get("geography"),
     )
     match = session.scalar(select(MatchScore).where(MatchScore.job_id == job.id))
     if match is None:

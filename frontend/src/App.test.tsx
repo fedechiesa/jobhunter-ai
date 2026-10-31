@@ -110,6 +110,7 @@ describe('dashboard', () => {
     vi.mocked(api.saveProfile).mockResolvedValue({ ...profile, skills: ['python', 'sql'] });
     render(<App />);
     await screen.findByText('55', { exact: true });
+    vi.mocked(api.jobs).mockResolvedValue([job]);
     await userEvent.click(screen.getByRole('button', { name: 'Mi perfil' }));
     const input = screen.getByLabelText('Habilidades, separadas por comas');
     await userEvent.clear(input);
@@ -154,7 +155,7 @@ describe('dashboard', () => {
     );
     expect(await screen.findByText('Llegaste al final')).toBeInTheDocument();
     await waitFor(() =>
-      expect(api.jobs).toHaveBeenLastCalledWith(1, { sort: 'priority', availability: 'active' }),
+      expect(api.jobs).toHaveBeenLastCalledWith(1, { sort: 'recommended', availability: 'active' }),
     );
     expect(screen.getByRole('button', { name: 'Siguiente →' })).toBeDisabled();
   });

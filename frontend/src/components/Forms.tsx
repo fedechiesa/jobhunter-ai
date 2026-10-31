@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
 import type { JobInput, Profile, ProfileInput } from '../types';
+import { api } from '../api';
+import { emptyProfessional, ProfessionalEditor } from './ProfessionalEditor';
 
 const splitSkills = (value: string) =>
   value
@@ -19,6 +21,28 @@ export function ProfileForm({ profile, busy, onSave }: ProfileFormProps) {
   const [years, setYears] = useState(profile?.experience_years ?? 0);
   const [location, setLocation] = useState(profile?.preferred_location ?? '');
   const [remote, setRemote] = useState(profile?.prefer_remote ?? true);
+  const [professional, setProfessional] = useState(profile?.professional ?? null);
+  const [draftError, setDraftError] = useState('');
+  const [draftLoading, setDraftLoading] = useState(false);
+
+  async function loadDraft() {
+    setDraftLoading(true);
+    setDraftError('');
+    try {
+      const draft = await api.profileDraft();
+      setSkills(draft.skills.join(', '));
+      setYears(draft.experience_years);
+      setLocation(draft.preferred_location);
+      setRemote(draft.prefer_remote);
+      setProfessional(draft.professional ?? emptyProfessional());
+    } catch {
+      setDraftError(
+        'No se pudo cargar el borrador local. Verificá private/profile.json. Podés editar el perfil manualmente.',
+      );
+    } finally {
+      setDraftLoading(false);
+    }
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -27,6 +51,27 @@ export function ProfileForm({ profile, busy, onSave }: ProfileFormProps) {
       experience_years: years,
       preferred_location: location,
       prefer_remote: remote,
+      ...(professional
+        ? {
+            professional: {
+              ...professional,
+              target_roles: professional.target_roles.map((s) => s.trim()).filter(Boolean),
+              projects: professional.projects.map((p) => ({
+                ...p,
+                technologies: p.technologies.map((s) => s.trim()).filter(Boolean),
+              })),
+              skills: splitSkills(skills).map((name) => ({
+                name,
+                details:
+                  professional.skills.find((s) => s.name.toLowerCase() === name.toLowerCase())
+                    ?.details ?? '',
+                confirmation:
+                  professional.skills.find((s) => s.name.toLowerCase() === name.toLowerCase())
+                    ?.confirmation ?? 'pending',
+              })),
+            },
+          }
+        : {}),
     });
   }
 
@@ -42,7 +87,11 @@ export function ProfileForm({ profile, busy, onSave }: ProfileFormProps) {
         Definí tus habilidades y preferencias para evaluar cada oportunidad. Al guardar, los scores
         anteriores quedan pendientes de recalcular.
       </p>
-      <fieldset disabled={busy}>
+      <fieldset disabled={busy || draftLoading}>
+        <button type="button" onClick={() => void loadDraft()}>
+          Cargar borrador profesional local
+        </button>
+        {draftError && <p role="alert">{draftError}</p>}
         <label>
           Habilidades, separadas por comas
           <input
@@ -54,7 +103,7 @@ export function ProfileForm({ profile, busy, onSave }: ProfileFormProps) {
         </label>
         <div className="form-grid">
           <label>
-            Años de experiencia
+            Años de experiencia IT remunerada
             <input
               type="number"
               min="0"
@@ -77,8 +126,29 @@ export function ProfileForm({ profile, busy, onSave }: ProfileFormProps) {
         </div>
         <label className="checkbox">
           <input type="checkbox" checked={remote} onChange={(e) => setRemote(e.target.checked)} />
-          Aceptar remoto en cualquier ubicación
+          Aceptar remoto compatible con mi país
         </label>
+        {professional ? (
+          <ProfessionalEditor
+            value={{
+              ...professional,
+              skills: splitSkills(skills).map((name) => ({
+                name,
+                details:
+                  professional.skills.find((s) => s.name.toLowerCase() === name.toLowerCase())
+                    ?.details ?? '',
+                confirmation:
+                  professional.skills.find((s) => s.name.toLowerCase() === name.toLowerCase())
+                    ?.confirmation ?? 'pending',
+              })),
+            }}
+            onChange={setProfessional}
+          />
+        ) : (
+          <button type="button" onClick={() => setProfessional(emptyProfessional())}>
+            Completar estudios, trabajos, proyectos e idiomas
+          </button>
+        )}
         <button className="primary" type="submit">
           {busy ? 'Guardando…' : 'Guardar perfil'}
         </button>

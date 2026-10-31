@@ -1,5 +1,10 @@
 [
   {"provider": "greenhouse", "board_token": "canonical", "company": "Canonical", "region": "global", "enabled": true},
   {"provider": "lever", "board_token": "dlocal", "company": "dLocal", "region": "global", "enabled": true},
-  {"provider": "ashby", "board_token": "Ashby", "company": "Ashby", "region": "global", "enabled": true}
+  {"provider": "ashby", "board_token": "Ashby", "company": "Ashby", "region": "global", "enabled": true},
+  {"provider": "greenhouse", "board_token": "sezzle", "company": "Sezzle", "region": "global", "enabled": true},
+  {"provider": "lever", "board_token": "despegar", "company": "Despegar", "region": "global", "enabled": true},
+  {"provider": "ashby", "board_token": "silver", "company": "Silver.dev", "region": "global", "enabled": true},
+  {"provider": "lever", "board_token": "RyzLabs", "company": "RYZ Labs", "region": "global", "enabled": true},
+  {"provider": "lever", "board_token": "muttdata", "company": "Mutt Data", "region": "global", "enabled": true}
 ]

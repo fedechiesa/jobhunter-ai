@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select, text, update
 from sqlalchemy.engine import Engine
@@ -15,6 +15,8 @@ from app.discovery.normalization import canonical_url, detected_requirements, pr
 from app.discovery.providers import JobProvider, ProviderError, provider_for
 from app.discovery.schemas import BoardConfig, NormalizedJob, SearchInput, SyncRead
 from app.models import CandidateProfile, JobPosting, JobSource, SyncRun
+from app.services.classification import classify_job
+from app.services.opportunities import experience
 from app.services.scores import persist_match
 
 LOCK_KEY = 73420261
@@ -84,12 +86,15 @@ def save_snapshot(
             )
         counts[change] += 1
         skills, years, known = detected_requirements(incoming.description)
+        evidence = experience(incoming.description)
+        years, known = evidence["value"] or 0, evidence["value"] is not None
         job.title, job.description, job.location = (
             incoming.title,
             incoming.description,
             incoming.location,
         )
         job.company = source.company_name or source.name
+        job.location_details = incoming.location_details or incoming.location
         job.remote = incoming.workplace_type == "remote"
         job.workplace_type = incoming.workplace_type
         job.url, job.apply_url = str(incoming.url), str(incoming.apply_url)
@@ -101,6 +106,17 @@ def save_snapshot(
         job.canonical_url = canonical_url(str(incoming.apply_url))
         job.search_priority, job.seniority = priority(
             job.title, job.description, job.location, years, known, preferences
+        )
+        classify_job(job, profile)
+        job.assessment["workplace"]["status"] = (
+            "unknown"
+            if job.workplace_type == "unknown"
+            else "confirmed"
+            if incoming.workplace_confirmed
+            else "inferred"
+        )
+        job.assessment["workplace"]["evidence"] = (
+            "Provider workplace field" if incoming.workplace_confirmed else job.location
         )
         session.flush()
         # Exact canonical application URL + company + title only; never fuzzy merge.
@@ -163,6 +179,16 @@ def synchronize(
                     source = session.get(JobSource, source_id)
                     if not source.enabled:
                         continue
+                    if source.next_allowed_at and source.next_allowed_at > datetime.now(UTC):
+                        results.append(
+                            {
+                                "source_id": source.id,
+                                "provider": source.kind,
+                                "board": source.board_token,
+                                "status": "deferred",
+                            }
+                        )
+                        continue
                     source.last_attempt_at = datetime.now(UTC)
                     board = BoardConfig(
                         provider=source.kind,
@@ -190,6 +216,10 @@ def synchronize(
                             None,
                             result,
                         )
+                        source.consecutive_failures = 0
+                        source.next_allowed_at = datetime.now(UTC) + timedelta(
+                            seconds=settings.source_min_interval_seconds
+                        )
                         session.commit()
                     except (ProviderError, SQLAlchemyError) as error:
                         session.rollback()
@@ -203,9 +233,20 @@ def synchronize(
                             "error": code,
                         }
                         source.last_error, source.last_result = code, result
+                        source.consecutive_failures += 1
+                        wait = min(
+                            settings.source_error_backoff_seconds
+                            * 2 ** min(source.consecutive_failures - 1, 10),
+                            86400,
+                        )
+                        source.next_allowed_at = datetime.now(UTC) + timedelta(
+                            seconds=max(wait, getattr(error, "retry_after_seconds", 0))
+                        )
                         if code in {
                             "http_401",
                             "http_403",
+                            "http_404",
+                            "retry_after_out_of_range",
                             "unsupported_region",
                             "unsupported_provider",
                         }:

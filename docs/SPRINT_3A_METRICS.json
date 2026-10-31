@@ -1,0 +1,187 @@
+{
+  "measured_at": "2026-10-31T17:38:44.292905+00:00",
+  "mode": "live_public_api",
+  "note": "Posting records before cross-source deduplication. Explicit junior includes non-IT roles. Unknown is never compatible.",
+  "sources": [
+    {
+      "provider": "greenhouse",
+      "board": "canonical",
+      "company": "Canonical",
+      "fetched": 313,
+      "explicit_argentina": 0,
+      "junior_explicit": 13,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 4,
+      "geography_unknown": 128,
+      "seniority_unknown": 141,
+      "published_unknown": 0,
+      "argentina_inferred": 0,
+      "geography_or_seniority_unknown": 212,
+      "experience_unknown": 295,
+      "categories": {
+        "deprioritized": 265,
+        "review_needed": 48
+      },
+      "status": "success"
+    },
+    {
+      "provider": "lever",
+      "board": "dlocal",
+      "company": "dLocal",
+      "fetched": 26,
+      "explicit_argentina": 0,
+      "junior_explicit": 0,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 2,
+      "geography_unknown": 14,
+      "seniority_unknown": 12,
+      "published_unknown": 0,
+      "argentina_inferred": 7,
+      "geography_or_seniority_unknown": 20,
+      "experience_unknown": 13,
+      "categories": {
+        "deprioritized": 26
+      },
+      "status": "success"
+    },
+    {
+      "provider": "ashby",
+      "board": "Ashby",
+      "company": "Ashby",
+      "fetched": 74,
+      "explicit_argentina": 0,
+      "junior_explicit": 0,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 6,
+      "geography_unknown": 10,
+      "seniority_unknown": 21,
+      "published_unknown": 0,
+      "argentina_inferred": 0,
+      "geography_or_seniority_unknown": 27,
+      "experience_unknown": 58,
+      "categories": {
+        "deprioritized": 73,
+        "review_needed": 1
+      },
+      "status": "success"
+    },
+    {
+      "provider": "greenhouse",
+      "board": "sezzle",
+      "company": "Sezzle",
+      "fetched": 273,
+      "explicit_argentina": 33,
+      "junior_explicit": 85,
+      "argentina_and_junior_explicit": 9,
+      "junior_inferred": 18,
+      "geography_unknown": 57,
+      "seniority_unknown": 63,
+      "published_unknown": 0,
+      "argentina_inferred": 0,
+      "geography_or_seniority_unknown": 106,
+      "experience_unknown": 133,
+      "categories": {
+        "deprioritized": 255,
+        "review_needed": 18
+      },
+      "status": "success"
+    },
+    {
+      "provider": "lever",
+      "board": "despegar",
+      "company": "Despegar",
+      "fetched": 125,
+      "explicit_argentina": 1,
+      "junior_explicit": 2,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 10,
+      "geography_unknown": 57,
+      "seniority_unknown": 77,
+      "published_unknown": 0,
+      "argentina_inferred": 37,
+      "geography_or_seniority_unknown": 97,
+      "experience_unknown": 71,
+      "categories": {
+        "deprioritized": 125
+      },
+      "status": "success"
+    },
+    {
+      "provider": "ashby",
+      "board": "silver",
+      "company": "Silver.dev",
+      "fetched": 39,
+      "explicit_argentina": 35,
+      "junior_explicit": 0,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 1,
+      "geography_unknown": 0,
+      "seniority_unknown": 24,
+      "published_unknown": 0,
+      "argentina_inferred": 0,
+      "geography_or_seniority_unknown": 24,
+      "experience_unknown": 23,
+      "categories": {
+        "deprioritized": 32,
+        "review_needed": 7
+      },
+      "status": "success"
+    },
+    {
+      "provider": "lever",
+      "board": "RyzLabs",
+      "company": "RYZ Labs",
+      "fetched": 49,
+      "explicit_argentina": 31,
+      "junior_explicit": 0,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 2,
+      "geography_unknown": 6,
+      "seniority_unknown": 26,
+      "published_unknown": 0,
+      "argentina_inferred": 8,
+      "geography_or_seniority_unknown": 29,
+      "experience_unknown": 18,
+      "categories": {
+        "deprioritized": 46,
+        "review_needed": 2,
+        "argentina_priority": 1
+      },
+      "status": "success"
+    },
+    {
+      "provider": "lever",
+      "board": "muttdata",
+      "company": "Mutt Data",
+      "fetched": 36,
+      "explicit_argentina": 16,
+      "junior_explicit": 0,
+      "argentina_and_junior_explicit": 0,
+      "junior_inferred": 0,
+      "geography_unknown": 4,
+      "seniority_unknown": 6,
+      "published_unknown": 0,
+      "argentina_inferred": 6,
+      "geography_or_seniority_unknown": 10,
+      "experience_unknown": 24,
+      "categories": {
+        "deprioritized": 31,
+        "review_needed": 5
+      },
+      "status": "success"
+    }
+  ],
+  "totals": {
+    "fetched": 935,
+    "explicit_argentina": 116,
+    "junior_explicit": 100,
+    "argentina_and_junior_explicit": 9,
+    "junior_inferred": 43,
+    "geography_unknown": 276,
+    "seniority_unknown": 370,
+    "published_unknown": 0,
+    "argentina_inferred": 58,
+    "geography_or_seniority_unknown": 525,
+    "experience_unknown": 635
+  }
+}

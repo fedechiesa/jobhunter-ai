@@ -19,6 +19,8 @@ class NormalizedJob(BaseModel):
     title: str = Field(min_length=1, max_length=200)
     description: str = Field(min_length=1, max_length=200000)
     location: str = Field(max_length=200)
+    location_details: str = Field(default="", max_length=20000)
+    workplace_confirmed: bool = False
     workplace_type: Literal["remote", "hybrid", "onsite", "unknown"]
     url: HttpUrl = Field(max_length=2048)
     apply_url: HttpUrl = Field(max_length=2048)
@@ -36,9 +38,9 @@ class SearchInput(BaseModel):
         default_factory=lambda: [
             "Data Analyst Junior / Trainee",
             "Python Developer Junior / Trainee",
-            "AI / LLM Developer Junior",
-            "Data Engineer Junior / Trainee",
-            "QA Automation Junior",
+            "AI / Data Science Trainee",
+            "BI Junior",
+            "Backend / Fullstack Junior",
         ],
         max_length=30,
     )
@@ -78,6 +80,8 @@ class SourceRead(BaseModel):
     last_success_at: datetime | None
     last_error: str | None
     last_result: dict | None
+    next_allowed_at: datetime | None
+    consecutive_failures: int
 
 
 class SourceUpdate(BaseModel):

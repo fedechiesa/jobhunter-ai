@@ -1,6 +1,6 @@
 # JobHunter AI
 
-Plataforma personal para descubrir ofertas desde APIs públicas, organizarlas y analizar compatibilidad con un perfil técnico. **Foundation y Job Discovery Engine implementados (Sprints 1 y 2).** Uso local y de un solo usuario.
+Plataforma personal para descubrir ofertas desde APIs públicas, organizarlas y analizar compatibilidad con un perfil técnico. **Sprints 1, 2 y 3A (Argentina First) implementados.** Uso local y de un solo usuario.
 
 Solo consulta APIs de lectura de Greenhouse, Lever y Ashby para tableros de empresas configuradas. No realiza scraping, llamadas a LLM, envío de CV ni postulaciones. No automatiza LinkedIn o Indeed.
 
@@ -115,6 +115,9 @@ Backend/Alembic leen `.env` raíz independientemente del directorio actual; el e
 | `PROVIDER_TIMEOUT_SECONDS` | Timeout HTTP por fase de conexión/lectura; default 10, máximo 30. |
 | `PROVIDER_MAX_ATTEMPTS` | Intentos por request, default 2, máximo 3. |
 | `PROVIDER_REQUEST_DELAY_SECONDS` | Pausa entre requests, default 0.3, mínimo 0.25 segundos. |
+| `SOURCE_MIN_INTERVAL_SECONDS` | Espera persistente por tablero después de una lectura correcta; default 60. |
+| `SOURCE_ERROR_BACKOFF_SECONDS` | Espera inicial tras error, default 60; crece exponencialmente hasta 24 horas. |
+| `PROFILE_DRAFT_FILE` | Borrador profesional privado, default `private/profile.json`. Nunca se versiona. |
 
 Si cambiás puertos o nombres, actualizá las URLs. Codificá caracteres especiales de passwords al construir URLs manualmente; el generador usa caracteres seguros para URL. `.env`, datos privados, CVs, dumps, node_modules, virtualenv, cobertura y builds se excluyen de Git.
 
@@ -129,6 +132,7 @@ Si cambiás puertos o nombres, actualizá las URLs. Codificá caracteres especia
 | GET | `/jobs/{id}` | Detalle; 404 si no existe. |
 | POST | `/jobs/{id}/match` | Calcula/actualiza score; 409 sin perfil, 404 sin oferta. Sin body. |
 | GET | `/profile` | Perfil; 404 antes del primer guardado. |
+| GET | `/profile/draft` | Valida y devuelve el borrador local explícito; 404 si no existe, 422 si es inválido. No lee CVs ni guarda automáticamente. |
 | PUT | `/profile` | Crea/actualiza singleton e invalida scores previos. |
 | GET | `/sources` | Configuración persistida de tableros y resultado de cada fuente. Registra nuevos tableros del JSON de forma idempotente. |
 | PATCH | `/sources/{id}` | Pausa/reactiva una fuente con `{"enabled": false/true}`. |
@@ -162,25 +166,53 @@ El matching mantiene habilidades 70%, experiencia 20% y ubicación 10%. La versi
 
 ## Fuentes, filtros y sincronización
 
-`config/sources.json` contiene Canonical/Greenhouse, dLocal/Lever y Ashby/Ashby. Los identificadores provienen de sus tableros públicos; no hay búsqueda global ni descubrimiento automático de empresas. Para agregar otro tablero, copiá el identificador de su URL pública y agregá un objeto con `provider`, `board_token`, `company`, `region` (`global`, o `eu` solo para Lever) y `enabled`.
+`config/sources.json` contiene ocho tableros verificados: Canonical y Sezzle (Greenhouse), dLocal, Despegar, RYZ Labs y Mutt Data (Lever), Ashby y Silver.dev (Ashby). Se conservaron los tres proveedores existentes; no hay búsqueda global ni descubrimiento automático de empresas. Antes de agregar otro tablero, verificá su URL pública, API documentada, respuesta y restricciones; luego agregá `provider`, `board_token`, `company`, `region` (`global`, o `eu` solo para Lever) y `enabled`. La evidencia y decisiones de integración están en [SPRINT_3A_VALIDATION.md](docs/SPRINT_3A_VALIDATION.md).
 
 El archivo admite hasta 20 tableros, con identificadores alfanuméricos, guiones y guiones bajos. La aplicación construye URLs únicamente en hosts oficiales; no acepta endpoints arbitrarios. Nuevos tableros se registran al consultar fuentes o sincronizar. Las pausas hechas en la interfaz persisten en DB. `enabled: false` en el archivo fuerza la pausa; quitar una entrada pausa su historial sin borrarlo. Volver a habilitar requiere que esté presente con `enabled: true` y activarla desde la interfaz/API. Los cambios de nombre de empresa se recogen en la próxima lectura.
 
 La migración agrega campos sin borrar ofertas, perfiles ni scores existentes. Cada referencia externa es única por proveedor/tablero. Las repeticiones actualizan la misma fila. Entre fuentes se detectan duplicados únicamente con URL de postulación normalizada, empresa y título exactamente iguales; los alias conservan historial y se ocultan del listado por defecto. `include_duplicates=true` permite auditarlos.
 
-Una lectura completa y válida permite marcar ausencias como **potencialmente inactivas**. No se borran ni se afirman cerradas. Timeouts, errores HTTP, datos inválidos o paginación incompleta conservan el estado anterior. Errores 401/403 o regiones no soportadas pausan solo esa fuente. Revisá el error antes de reactivarla.
+Una lectura completa y válida permite marcar ausencias como **potencialmente inactivas**. No se borran ni se afirman cerradas. Timeouts, errores HTTP, datos inválidos o paginación incompleta conservan el estado anterior. Errores 401/403/404 o regiones no soportadas pausan solo esa fuente. Revisá el error antes de reactivarla. `next_allowed_at` y el contador de fallos persisten entre procesos; las ejecuciones durante la espera reportan `deferred` y no marcan ausencias. Se respeta también `Retry-After` largo o expresado como fecha.
 
 Se excluyen entradas explícitas de Talent Pool/bolsa de talento de todos los proveedores y prospect posts de Greenhouse. Si se habían importado antes de esta corrección, conservan su historial y quedan fuera de las vacantes activas. Eso no significa que la bolsa de talento haya cerrado.
 
-La interfaz filtra por palabra clave, ubicación textual, proveedor, modalidad, fecha de descubrimiento, disponibilidad y score mínimo; ordena por fecha, prioridad o compatibilidad. También se admite `published_after` y `min_priority` en API. Los filtros se combinan con AND; las fechas de publicación desconocidas no coinciden con `published_after`.
+La interfaz filtra por palabra clave, ubicación textual, país (Argentina, otros o desconocido), seniority, clasificación, tablero, proveedor, modalidad, publicación, descubrimiento, disponibilidad y score mínimo. El orden inicial `recommended` muestra Prioritaria Argentina, Alternativa internacional, Revisión necesaria y Despriorizada; dentro de cada grupo prioriza el idioma preferido y la prioridad de búsqueda. También siguen disponibles los órdenes por fecha, prioridad o score. Los filtros se combinan con AND; fechas de publicación desconocidas no coinciden con `published_after`.
 
 ```text
 GET /jobs?q=python&location=Argentina&provider=lever&availability=active&sort=priority
 GET /jobs?workplace_type=hybrid&discovered_after=2026-01-01T00:00:00Z
 GET /jobs?min_score=70&sort=score
+GET /jobs?country=AR&seniority=junior&compatibility=argentina_priority&sort=recommended
+GET /jobs?source_id=119&published_after=2026-10-01T00:00:00Z
 ```
 
-`min_score` requiere resultados previamente calculados. Las preferencias iniciales priorizan roles junior/trainee de datos, Python, AI/LLM y QA, tecnologías indicadas por el usuario, Argentina/CABA/GBA y hasta dos años. Los requisitos ambiguos no se descartan; los puestos claramente senior reciben menor prioridad. Ubicaciones como Worldwide/Americas son pistas para revisar, no confirmación de que aceptan candidatos de Argentina.
+`min_score` requiere resultados previamente calculados. Las preferencias iniciales priorizan Data Analyst/BI Jr, Python Jr/Trainee, AI/Data Science Trainee y Backend/Fullstack Jr, Argentina/CABA/GBA y hasta dos años. Las preferencias ya guardadas se conservan. Los requisitos ambiguos quedan para revisión; los puestos claramente senior se despriorizan y se conservan. Worldwide/Americas/LATAM son pistas para revisar, nunca confirmación de admisión desde Argentina. `assessment` expone valor, estado (`confirmed`, `inferred`, `unknown`), fragmento de evidencia y razones; confirmación significa declaración de la fuente, no verificación legal de elegibilidad.
+
+## Perfil profesional editable y privado
+
+El singleton existente conserva `skills`, `experience_years`, `preferred_location` y `prefer_remote`. La extensión opcional `professional` contiene competencias con contexto y confirmación, estudios, trabajos, proyectos, idiomas, roles objetivo, país de residencia, idioma preferido y máximo de experiencia requerida. Los años del perfil representan experiencia IT remunerada; no se suman estudios, proyectos ni trabajos de otro sector. No se inventan fechas, logros, empleadores ni niveles de dominio. `pending` es el estado inicial de detalles no confirmados; `user_confirmed` significa confirmado por el usuario, sin validación externa.
+
+En esta copia de trabajo, la información declarada se preparó exclusivamente en `private/profile.json` (ignorado por Git) y se guardó en la base local. Desde **Mi perfil** se pueden editar todas las secciones, agregar/quitar entradas y cambiar su confirmación; **Cargar borrador profesional local** carga ese archivo para revisión. No se necesita actualizar PDF o LinkedIn. Un clon nuevo no incluye información profesional privada: completá el formulario o creá explícitamente tu borrador con el contrato de `/docs`.
+
+Después de aplicar migraciones, también se puede inicializar el perfil desde ese borrador:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/setup_profile.py
+.\.venv\Scripts\python.exe scripts/setup_profile.py --reclassify-only
+```
+
+El primer comando preserva un perfil existente; `--replace` permite reemplazarlo explícitamente. Reclasificar conserva ofertas y referencias históricas. Guardar el perfil invalida scores y recalcula categorías; el próximo match o sync calcula los scores con las nuevas entradas. El esquema versionado y `origin` preparan una futura importación local de CV, que no está implementada.
+
+Se mantiene el matching 70/20/10. Con perfil estructurado usa `deterministic-v1.2-ar`: remoto desconocido/restringido no recibe puntos geográficos y presencial requiere ubicación compatible. El perfil antiguo conserva `v1.1` hasta completar su extensión, para no reinterpretar silenciosamente datos históricos. El score técnico no es elegibilidad ni probabilidad de contratación; años desconocidos conservan la convención de scoring anterior y se muestran explícitamente como desconocidos.
+
+Auditoría reproducible de los tableros, sin DB ni datos del candidato:
+
+```powershell
+.\.venv\Scripts\python.exe scripts/audit_sources.py --save-snapshots .local/sprint3a-snapshots
+.\.venv\Scripts\python.exe scripts/audit_sources.py --snapshots .local/sprint3a-snapshots --output .local/sprint3a-offline.json
+```
+
+La medición de este sprint obtuvo 935 publicaciones, 116 con Argentina explícita, 100 junior/trainee explícitas y 9 con ambos criterios. Esos nueve registros incluyen roles ajenos a IT. La revisión de cierre corrigió un falso positivo: un rango de 2–4 años y comunicación profesional en inglés no acreditan un puesto junior adecuado. Con `argentina-v1.1` quedan **0 prioritarias, 82 para revisión y 853 despriorizadas**, sin alternativas internacionales confirmadas. Data Developer de Mutt Data es una pista condicionada por inglés y seniority desconocidos, no una compatibilidad garantizada. Muestra de nueve ofertas, enlaces, requisitos y resultados en [SPRINT_3A_RELEASE_VALIDATION.md](docs/SPRINT_3A_RELEASE_VALIDATION.md).
 
 ## Automatización periódica
 
@@ -238,8 +270,8 @@ npm.cmd audit
 
 ## Estado y límites
 
-Operativos: ofertas manuales y reales, tres proveedores públicos configurables, normalización, deduplicación, historial de sincronización, filtros, preferencias editables, perfil y scores persistentes, dashboard con paginación, pausa por fuente y worker independiente. Las métricas del dashboard corresponden a la página actual.
+Operativos: ofertas manuales y reales, tres proveedores y ocho tableros públicos verificados, normalización, deduplicación, evidencia geográfica y de requisitos, clasificación Argentina First, historial de sincronización, filtros, preferencias editables, perfil profesional estructurado y scores persistentes, dashboard con paginación, espera/pausa por fuente y worker independiente. Las métricas del dashboard corresponden a la página actual.
 
-Sin autenticación, edición/borrado manual de ofertas, CV, historial de versiones de score, LLMs, agentes ni postulaciones automáticas. Las APIs cubren únicamente las empresas configuradas. El remoto no valida permisos laborales o restricciones de país; la lectura comprobada de Ashby no mostró ubicaciones explícitas de Argentina. Uso local; no está preparado para exposición pública o multiusuario. Las URLs se abren solo por decisión del usuario.
+Sin autenticación, edición/borrado manual de ofertas, importación/generación de CV, historial de versiones de score, LLMs, agentes ni postulaciones automáticas. Las APIs cubren únicamente las empresas configuradas. Las reglas geográficas no validan permisos laborales; Ashby ahora aporta cobertura argentina mediante Silver.dev. Uso local; no está preparado para exposición pública o multiusuario. Las URLs se abren solo por decisión del usuario.
 
-Próxima fase propuesta: mejorar cobertura de tableros y revisar la precisión de requisitos y ubicaciones, según [ROADMAP.md](docs/ROADMAP.md). No se implementó el Sprint 3. La validación de cierre y el muestreo real están en [SPRINT_2_RELEASE_VALIDATION.md](docs/SPRINT_2_RELEASE_VALIDATION.md); la revisión visual no pudo aprobarse por limitaciones de acceso al navegador.
+Sprint 3A cerrado dentro de su alcance; Sprint 3B pendiente según [ROADMAP.md](docs/ROADMAP.md). La evidencia actual está en [SPRINT_3A_VALIDATION.md](docs/SPRINT_3A_VALIDATION.md). La revisión visual quedó pendiente por timeout de autorización de la herramienta; tests de componentes y verificación HTTP aprobados. Los informes de Sprints 1 y 2 conservan sus resultados históricos.

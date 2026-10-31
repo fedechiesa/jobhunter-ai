@@ -18,17 +18,28 @@
 - Tests con respuestas simuladas, migración preservando Sprint 1 y lecturas reales controladas.
 - Sprint 1 publicado en `9a92362`; CI remota aprobada. Cierre del Sprint 2 con muestreo de 14 registros y correcciones de Talent Pool, años explícitos y ubicaciones alternativas; ver `SPRINT_2_RELEASE_VALIDATION.md`.
 
-## Sprint 3 — Cobertura y precisión (solo propuesto; sin implementar)
+## Sprint 3A — Argentina First y perfil profesional (implementado)
 
-- Seleccionar más tableros autorizados con evidencia de cobertura Argentina/junior.
-- Revisar precisión de extracción de requisitos y restricciones geográficas, conservando incertidumbre.
-- Mejorar deduplicación solo con evidencia, evaluación y trazabilidad.
-- Evaluar edición/archivo de ofertas y seguimiento personal de candidaturas, sin envío.
-- Mantener exclusión de LinkedIn/Indeed, scraping y elusión de controles.
+- Ocho tableros verificados de Greenhouse, Lever y Ashby; cinco incorporados, sin APIs supuestas ni scraping.
+- Geografía argentina, CABA/GBA, remoto restringido, seniority, experiencia e idioma con evidencia confirmada/inferida/desconocida.
+- Clasificación Prioritaria Argentina / Alternativa internacional / Revisión necesaria / Despriorizada; razones visibles y matching determinista 70/20/10 reutilizado.
+- Perfil editable con competencias y contexto, estudios, trabajos, proyectos, idiomas y objetivos. Datos iniciales declarados únicamente en archivo privado/base local, pendientes de confirmación; sin CV ni datos personales en Git.
+- Dashboard existente extendido con filtros y orden recomendado; cooldown persistente y backoff por tablero.
+- Migración aditiva y pruebas de preservación de Sprints 1 y 2, sincronización repetida, deduplicación, reglas, matching y persistencia.
+- Medición real de 935 publicaciones: 116 Argentina explícita, 100 junior explícitas, 9 con ambos criterios (incluye roles no IT). Cierre: nueve ofertas verificadas y un falso positivo de prioridad corregido; 0 prioritarias y 82 para revisión. Ver `SPRINT_3A_RELEASE_VALIDATION.md`; el informe inicial conserva métricas previas a la corrección.
+
+## Sprint 3B — Precisión y seguimiento (pendiente; no iniciado)
+
+- Evaluar manualmente falsos positivos/negativos de geografía, experiencia, idioma y requisitos excluyentes con una muestra etiquetada.
+- Continuar buscando fuentes junior de Argentina; evaluar el contrato de la API pública de Get on Board y condiciones antes de integrarla.
+- Refinar roles, alias tecnológicos y restricciones solo con evidencia y tests. Evitar considerar una señal junior como elegibilidad suficiente.
+- Evaluar edición/archivo y seguimiento personal de candidaturas, sin envíos.
+- Completar revisión visual; mantener exclusión de scraping prohibido, elusión de restricciones y automatización de portales.
 
 ## Fase 4 — Asistencia de candidatura
 
 - Importación voluntaria y privada del CV, retención y borrado.
+- Importar un CV maestro local sobre el esquema profesional versionado, preservando procedencia y confirmaciones; comparar contra declaraciones existentes antes de aceptar cambios.
 - Matching mejorado; LLMs optativos con evaluación y revisión de privacidad.
 - Preparación de borradores de CV/carta con revisión humana.
 
@@ -36,7 +47,8 @@
 
 - Conectores expresamente habilitados por usuario y proveedor.
 - Vista previa y confirmación de cada envío, auditoría e idempotencia.
-- Ningún envío real de CV o postulación pertenece al Sprint 1.
+- Objetivo final: preparar candidaturas personalizadas desde el perfil/CV maestro, gestionar aprobaciones del usuario, enviar únicamente por canales autorizados y registrar envíos, respuestas y estado de cada proceso.
+- Ningún envío real, generación de CV ni navegación automática de portales pertenece al Sprint 3A.
 
 ## Fase 6 — Orquestación multiagente, si se justifica
 

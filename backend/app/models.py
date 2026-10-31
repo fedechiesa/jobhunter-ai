@@ -30,6 +30,7 @@ class CandidateProfile(Base):
     experience_years: Mapped[int] = mapped_column(Integer)
     preferred_location: Mapped[str] = mapped_column(String(200))
     prefer_remote: Mapped[bool] = mapped_column(Boolean)
+    professional: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
 
 class JobSource(Base):
@@ -47,6 +48,8 @@ class JobSource(Base):
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(String(200))
     last_result: Mapped[dict | None] = mapped_column(JSON)
+    next_allowed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
 
 class JobPosting(Base):
@@ -61,6 +64,7 @@ class JobPosting(Base):
     company: Mapped[str] = mapped_column(String(200))
     description: Mapped[str] = mapped_column(Text)
     location: Mapped[str] = mapped_column(String(200))
+    location_details: Mapped[str | None] = mapped_column(Text, nullable=True)
     remote: Mapped[bool] = mapped_column(Boolean)
     required_skills: Mapped[list[str]] = mapped_column(JSON)
     experience_years: Mapped[int] = mapped_column(Integer)
@@ -96,6 +100,11 @@ class JobPosting(Base):
     experience_years_known: Mapped[bool] = mapped_column(
         Boolean, default=True, server_default="true"
     )
+    country: Mapped[str] = mapped_column(String(20), default="unknown", server_default="unknown")
+    compatibility: Mapped[str] = mapped_column(
+        String(30), default="review_needed", server_default="review_needed", index=True
+    )
+    assessment: Mapped[dict] = mapped_column(JSON, default=dict, server_default="{}")
 
     @property
     def provider(self) -> str:

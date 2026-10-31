@@ -79,6 +79,7 @@ export const api = {
   },
   saveProfile: (data: ProfileInput) =>
     request<Profile>('/profile', { method: 'PUT', body: JSON.stringify(data) }),
+  profileDraft: () => request<ProfileInput>('/profile/draft'),
   match: (id: number) => request<MatchScore>(`/jobs/${id}/match`, { method: 'POST' }),
   sources: () => request<Source[]>('/sources'),
   updateSource: (id: number, enabled: boolean) =>

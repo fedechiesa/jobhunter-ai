@@ -33,6 +33,8 @@ def discovery_env(migrated_engine, tmp_path, application, monkeypatch):
         _env_file=None,
         database_url="postgresql+psycopg://unused@localhost/unused",
         sources_file=path,
+        source_min_interval_seconds=0,
+        source_error_backoff_seconds=0,
     )
     records = {"greenhouse": [], "lever": []}
 
@@ -253,3 +255,137 @@ def test_profile_updates_do_not_fabricate_experience(discovery_env, normalized_j
     job = client.get("/jobs").json()[0]
     assert job["experience_years"] == 0 and job["experience_years_known"] is False
     assert client.get("/profile").status_code == 404
+
+
+def test_argentina_classification_filters_and_profile_reassessment(discovery_env, normalized_job):
+    engine, settings, records, factory, client = discovery_env
+    records["greenhouse"] = [normalized_job]
+    records["lever"] = [
+        normalized_job.model_copy(
+            update={
+                "external_id": "other",
+                "title": "Senior Python Developer",
+                "location": "Worldwide",
+                "workplace_type": "remote",
+                "apply_url": HttpUrl("https://example.com/other"),
+            }
+        )
+    ]
+    synchronize(engine, settings, factory)
+    assert (
+        len(client.get("/jobs?country=AR&seniority=junior&compatibility=argentina_priority").json())
+        == 1
+    )
+    assert client.get("/jobs?sort=recommended").json()[0]["title"] == normalized_job.title
+    assert len(client.get("/jobs?compatibility=deprioritized").json()) == 1
+    assert client.get("/jobs?published_after=2100-01-01T00:00:00Z").json() == []
+    job = client.get("/jobs?compatibility=argentina_priority").json()[0]
+    assert len(client.get(f"/jobs?source_id={job['source_id']}").json()) == 1
+    original_id = job["id"]
+    profile = {
+        "skills": ["python", "sql"],
+        "experience_years": 0,
+        "preferred_location": "CABA",
+        "professional": {
+            "education": [{"title": "Fictional program"}],
+            "languages": [{"name": "English", "level": "intermediate"}],
+            "projects": [{"name": "Fictional project"}],
+        },
+    }
+    assert client.put("/profile", json=profile).status_code == 200
+    synchronize(engine, settings, factory)
+    job = client.get(f"/jobs/{original_id}").json()
+    assert job["match_score"]["algorithm_version"] == "deterministic-v1.2-ar"
+    assert job["assessment"]["geography"]["status"] == "confirmed"
+    with Session(engine) as reader:
+        assert reader.get(JobPosting, original_id).assessment == job["assessment"]
+        assert (
+            reader.get(CandidateProfile, 1).professional["education"][0]["confirmation"]
+            == "pending"
+        )
+        assert reader.get(CandidateProfile, 1).experience_years == 0
+    changed = profile | {
+        "professional": profile["professional"] | {"target_roles": ["Unrelated profession"]}
+    }
+    client.put("/profile", json=changed)
+    assert client.get(f"/jobs/{original_id}").json()["compatibility"] == "deprioritized"
+    assert client.get(f"/jobs/{original_id}").json()["match_score"] is None
+    assert client.get("/jobs?country=invalid").status_code == 422
+
+
+def test_source_cooldown_survives_sessions_and_repeated_errors(discovery_env, normalized_job):
+    from datetime import timedelta
+
+    from app.models import JobSource
+
+    engine, settings, records, factory, client = discovery_env
+    settings.source_min_interval_seconds = 60
+    settings.source_error_backoff_seconds = 60
+    records["greenhouse"] = [normalized_job]
+    records["lever"] = ProviderError("network_or_timeout")
+    first = synchronize(engine, settings, factory)
+    assert first.status == "partial"
+    records["greenhouse"] = []
+    deferred = synchronize(engine, settings, factory)
+    assert all(result["status"] == "deferred" for result in deferred.source_results)
+    assert client.get("/jobs").json()[0]["availability"] == "active"
+    with Session(engine) as writer:
+        source = writer.scalar(select(JobSource).where(JobSource.kind == "lever"))
+        source.next_allowed_at = datetime.now(UTC) - timedelta(seconds=1)
+        writer.commit()
+    synchronize(engine, settings, factory)
+    with Session(engine) as reader:
+        source = reader.scalar(select(JobSource).where(JobSource.kind == "lever"))
+        assert source.consecutive_failures == 2
+        assert source.next_allowed_at > datetime.now(UTC) + timedelta(seconds=110)
+
+
+def test_unknown_publication_and_worldwide_are_never_confirmed(discovery_env, normalized_job):
+    engine, settings, records, factory, client = discovery_env
+    records["greenhouse"] = [
+        normalized_job.model_copy(
+            update={"location": "Worldwide", "published_at": None, "workplace_type": "remote"}
+        )
+    ]
+    synchronize(engine, settings, factory)
+    job = client.get("/jobs").json()[0]
+    assert job["country"] == "unknown" and job["compatibility"] == "review_needed"
+    assert client.get("/jobs?published_after=2020-01-01T00:00:00Z").json() == []
+    client.put("/profile", json={"skills": ["python", "sql"], "professional": {}})
+    assert client.post(f"/jobs/{job['id']}/match").json()["location_score"] == 0
+
+
+def test_release_corrections_persist_through_repeated_sync(discovery_env, normalized_job):
+    engine, settings, records, factory, client = discovery_env
+    client.put("/profile", json={"skills": ["python", "sql"], "professional": {}})
+    records["greenhouse"] = [
+        normalized_job.model_copy(
+            update={
+                "title": "Software Engineer",
+                "description": (
+                    "Required Qualifications\n2-4 years of experience\n"
+                    "Strong written and verbal English communication skills."
+                ),
+            }
+        )
+    ]
+    synchronize(engine, settings, factory)
+    job = client.get("/jobs").json()[0]
+    assert job["compatibility"] == "review_needed" and job["seniority"] == "unknown"
+    original_id = job["id"]
+    repeated = synchronize(engine, settings, factory)
+    assert repeated.source_results[0]["unchanged"] == 1
+    assert client.get("/jobs").json()[0]["id"] == original_id
+    records["greenhouse"] = [
+        normalized_job.model_copy(
+            update={
+                "title": "Fraud Data Analyst",
+                "description": "Minimum of two (2) years of experience in a fraud detection role.",
+            }
+        )
+    ]
+    synchronize(engine, settings, factory)
+    job = client.get(f"/jobs/{original_id}").json()
+    assert job["experience_years_known"] and job["experience_years"] == 2
+    assert job["match_score"]["experience_score"] == 0
+    assert job["compatibility"] == "review_needed"

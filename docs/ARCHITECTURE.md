@@ -1,4 +1,4 @@
-# Arquitectura — Foundation + Discovery Engine
+# Arquitectura — Foundation + Discovery Engine + Argentina First
 
 Aplicación local, de un usuario. Monolito modular con un worker opcional de descubrimiento que reutiliza los servicios de la API. Sin agentes, colas, autenticación ni llamadas a LLM.
 
@@ -37,16 +37,36 @@ No se introduce un repositorio genérico: SQLAlchemy ya proporciona la abstracci
 
 | Entidad | Responsabilidad |
 | --- | --- |
-| CandidateProfile | Perfil técnico sin nombre, email ni CV. Singleton `id=1`, skills, años y preferencias. Se crea explícitamente. |
+| CandidateProfile | Singleton `id=1` explícito. Conserva skills, años y preferencias; JSON opcional `professional` versionado con competencias/contexto/confirmación, estudios, trabajos, proyectos, idiomas y objetivos. Sin nombre, email ni CV. |
 | JobSource | Fuente manual y tableros públicos: proveedor, empresa, identificador, región, enabled, fechas, error y último resultado. |
-| JobPosting | Campos originales más referencia externa, modalidad, URLs, publicación opcional, primera/última observación, disponibilidad, hash y prioridad. |
-| MatchScore | Un resultado actual por oferta, con score, componentes, skills coincidentes/faltantes, perfil y versión; resultados nuevos `deterministic-v1.1`. |
+| JobPosting | Campos originales más referencia externa, modalidad, URLs, publicación opcional, observaciones, disponibilidad, hash, prioridad, país agrupado, categoría y evidencia JSON. `location_details` conserva ubicaciones completas y países estructurados sin truncar a los 200 caracteres del resumen. |
+| MatchScore | Un resultado actual por oferta; componentes 70/20/10 y versión. `deterministic-v1.2-ar` para perfil estructurado, `v1.1` para perfil legado. |
 | SearchPreferences | Intereses editables de búsqueda, separados de habilidades/experiencia declaradas por el candidato. |
 | SyncRun | Historial de estados, fechas y resultados por fuente de cada ejecución. |
 
 Skills en JSON, normalizadas con trim, casefold, deduplicación y orden. El backend no visita URLs de ofertas: solo consulta los hosts oficiales de API. No hay edición manual de ofertas; el servicio actualiza registros importados. Listado paginado `limit/offset`, ID descendente por defecto, con orden opcional por prioridad o score.
 
 El matching actualiza o crea un único resultado: repetirlo con las mismas entradas produce el mismo resultado y no agrega filas. Guardar el perfil elimina los scores previos en la misma transacción. `SELECT FOR UPDATE` sobre el perfil serializa sus actualizaciones y el matching para evitar persistir scores obsoletos. Sin historial de perfiles/scores.
+
+## Argentina First y perfil estructurado (Sprint 3A)
+
+`services/opportunities.py` implementa reglas puras, sin LLM, y `services/classification.py` las aplica a los modelos. Cada hecho contiene `value`, `status` y `evidence`. `confirmed` significa explícito en el campo de la fuente o la carga manual; `inferred` es una interpretación por reglas; `unknown` conserva la ausencia. No es una verificación legal de admisión o permisos laborales.
+
+La geografía usa ubicación completa y los países estructurados disponibles en Ashby. Argentina explícita se diferencia de CABA/GBA/Buenos Aires inferidos. Córdoba sin contexto extranjero es una inferencia; Córdoba, España no se atribuye a Argentina. Worldwide/LATAM/Americas solo son indicios. Una frase explícita de remoto desde Argentina en la descripción puede habilitar alternativa internacional; menciones de clientes o sedes no lo hacen. Restricciones reconocidas tienen precedencia ante señales contradictorias. La detección no cubre todos los países ni redacciones posibles.
+
+Se reconocen títulos junior/trainee/pasante/entry level y puestos senior/staff/lead/principal. La experiencia numérica, rangos y ciertos números escritos se extraen con fragmento de evidencia; se distinguen requisitos opcionales por línea/sección. Años faltantes son `null` en la evidencia, sin equivaler a cero. `JobPosting.experience_years` conserva el contrato numérico previo para scoring, acompañado por `experience_years_known`. Idioma de la publicación y exigencia de inglés son hechos distintos; prosa inglesa no prueba inglés avanzado. Se exponen posibles requisitos excluyentes y se revisan dominios específicos como experiencia contable.
+
+Categorías: `argentina_priority`, `international_alternative`, `review_needed` y `deprioritized`. La prioridad argentina requiere rol objetivo, señal junior, ubicación nacional compatible y modalidad conocida; presencial/híbrido se limita a la zona preferida. Seniority claramente superior, experiencia mínima mayor al objetivo o restricciones incompatibles despriorizan. Datos ambiguos y roles técnicos cercanos permanecen para revisión. No se elimina ninguna vacante por relevancia.
+
+La revisión de cierre versionó estas reglas como `argentina-v1.1`: inferir junior desde un rango requiere que su extremo superior no exceda el objetivo; 2–4 años queda para revisión. Se reconocen números redundantes concordantes como palabra/dígito entre paréntesis. Las exigencias de comunicación/proficiency en inglés se registran sin inventar un nivel avanzado y requieren revisión si no hay nivel explícito. Los requisitos de fraude se distinguen de conocimientos de SQL. La lista de posibles excluyentes recoge secciones de requisitos y omite encabezados y negaciones como experiencia no requerida. Estas correcciones están cubiertas por regresiones unitarias y de sync repetido/persistencia.
+
+La clasificación considera roles, límite de años, país, preferencia remota, zona e inglés del perfil. Inglés avanzado solo se utiliza cuando el usuario lo confirma. Competencias pendientes participan como declaraciones en el score, sin presumir dominio; el resultado lo advierte. Preferencia de idioma ordena dentro de categoría. El orden `recommended` se aplica en SQL antes de paginar; filtros por país agrupado (AR/otros/desconocido), seniority, clasificación, tablero y publicación se combinan con los existentes.
+
+`ProfileInput.professional` valida listas acotadas, estados y confirmaciones. La evidencia de competencias debe referirse a habilidades declaradas; habilidades nuevas reciben `pending`. Estudios, trabajos y proyectos se conservan separados y nunca incrementan automáticamente años IT remunerados. `schema_version` y `origin` reservan procedencia para importación posterior, sin implementarla. El formulario permite editar estas secciones y guardar contra el mismo singleton.
+
+`GET /profile/draft` carga solo el archivo local indicado por configuración; no recibe paths del navegador ni visita URLs. El archivo es explícito, privado e ignorado por Git. Los errores no devuelven su contenido. `scripts/setup_profile.py` valida y persiste ese borrador; preserva un perfil existente salvo `--replace`, y permite reclasificar históricos. Actualizar el perfil reclasifica todas las filas e invalida scores bajo el bloqueo existente. Ninguna migración contiene información profesional del usuario.
+
+Para perfiles estructurados, `v1.2-ar` conserva pesos y skills exactas, pero exige evidencia argentina para otorgar puntos geográficos. Remoto desconocido no los recibe y presencial requiere zona compatible. La función recibe la evidencia completa persistida aunque el resumen de ubicación tenga 200 caracteres. La convención anterior de score para requisitos ausentes permanece; por eso score y clasificación se muestran separados y no son probabilidad de contratación.
 
 ## Matching v1
 
@@ -87,6 +107,8 @@ Todas las vacantes válidas se persisten. Los títulos explícitos de Talent Poo
 
 El worker ejecuta un ciclo inmediato y espera el intervalo desde su finalización. Puede ejecutarse como proceso supervisado o invocarse con `--once` desde un scheduler. No se inicia desde el lifespan de FastAPI y no depende de `--reload`. Los logs de descubrimiento son eventos JSON; la UI consulta estado cada 10 segundos y permite pausar fuentes.
 
+Sprint 3A agrega `JobSource.next_allowed_at` y `consecutive_failures`: espera mínima tras éxito y backoff exponencial tras error, persistidos entre procesos y compartidos por API/worker bajo el advisory lock. `Retry-After` numérico largo o fecha se transmite desde el lector al cooldown. Una fuente en espera devuelve `deferred` sin fetch ni cambios de disponibilidad. 401/403/404 y regiones inválidas pausan la fuente. Los tiempos operativos y contadores aparecen en `/sources` y el dashboard.
+
 `config/sources.json` es configuración pública. El registro de tableros ocurre de forma idempotente al consultar fuentes o sincronizar, con upsert por proveedor/tablero/región. Actualiza etiquetas de empresa sin reactivar pausas persistidas; entradas deshabilitadas o retiradas fuerzan pausa y conservan su historial. Sin escrituras de configuración ni creación de tareas del SO desde la API.
 
 ## Infraestructura y pruebas
@@ -94,6 +116,8 @@ El worker ejecuta un ciclo inmediato y espera el intervalo desde su finalizació
 Compose publica PostgreSQL solo en `127.0.0.1`: desarrollo en 5432 con volumen persistente; pruebas en 5433, con `tmpfs`, base y credenciales diferentes. Puertos configurables. API y Vite también escuchan en loopback según los comandos documentados.
 
 Alembic es el único creador del esquema; el arranque no usa `create_all`. La migración inicial crea las cuatro entidades base; `2e57c63bd9b7` agrega descubrimiento sin eliminar datos, conserva fechas históricas y traslada el remoto manual a modalidad. Un test dedicado crea datos del esquema Sprint 1 y comprueba su preservación. `/health/db` ejecuta `SELECT 1`, sin verificar el estado de las migraciones.
+
+`0003_argentina_first` agrega perfil opcional, ubicación completa, evidencia, clasificación, índice y cooldown sin borrar filas ni scores. Los históricos parten de clasificación desconocida/revisión; `setup_profile.py --reclassify-only`, guardar perfil o sincronizar los actualiza. Se comprueba preservación explícita de perfiles, ofertas y scores del Sprint 2, además del test de Sprint 1. El primer sync actualiza hashes por los nuevos campos normalizados sin cambiar referencias externas ni primera observación.
 
 Integración exige driver `postgresql+psycopg`, nombre de base terminado en `_test` y destino diferente a desarrollo. Crea un esquema con UUID, ejecuta `upgrade → downgrade → upgrade → check`, aísla tests con transacciones/savepoints y elimina solo su esquema al terminar. Otro test confirma persistencia después de commit desde otra conexión. No se usa SQLite ni se modifica el esquema de desarrollo.
 
@@ -105,4 +129,4 @@ Passwords aleatorios en `.env` local ignorado. Sin perfiles personales, CVs, dum
 
 Sin autenticación: uso exclusivamente local. CORS no reemplaza autenticación. Exponerlo en una red requiere una fase de seguridad adicional.
 
-Futuras fuentes autorizadas podrán implementar `JobProvider` y producir `NormalizedJob`. Si se justifica un sistema multiagente, los agentes podrán invocar estos servicios con permisos y auditoría. No se implementan postulaciones, envíos, agentes ni el Sprint 3. Límites de cobertura y evidencia: [SPRINT_2_VALIDATION.md](SPRINT_2_VALIDATION.md).
+Futuras fuentes autorizadas podrán implementar `JobProvider` y producir `NormalizedJob`. Si se justifica un sistema multiagente, los agentes podrán invocar estos servicios con permisos y auditoría. No se implementan postulaciones, envíos, agentes ni Sprint 3B. Evidencia actual y límites: [SPRINT_3A_VALIDATION.md](SPRINT_3A_VALIDATION.md); los informes previos conservan los resultados de sus respectivas versiones.

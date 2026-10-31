@@ -20,6 +20,20 @@ export function JobCard({ job, busy, matching, hasProfile, onMatch }: Props) {
     <article className="job-card">
       <div className="job-main">
         <div className="discovery-meta">
+          {job.compatibility && (
+            <strong>
+              {
+                (
+                  {
+                    argentina_priority: 'Prioritaria Argentina',
+                    international_alternative: 'Alternativa internacional',
+                    review_needed: 'Revisión necesaria',
+                    deprioritized: 'Despriorizada',
+                  } as Record<string, string>
+                )[job.compatibility]
+              }
+            </strong>
+          )}
           <span>{job.provider ?? 'manual'}</span>
           {job.first_discovered_at && (
             <span>
@@ -56,6 +70,71 @@ export function JobCard({ job, busy, matching, hasProfile, onMatch }: Props) {
             : `${job.experience_years} años de experiencia`}
         </p>
         <p className="job-description">{job.description}</p>
+        {job.published_at && (
+          <p>Publicada: {new Date(job.published_at).toLocaleDateString('es-AR')}</p>
+        )}
+        {job.assessment?.reasons && (
+          <details>
+            <summary>Razones y evidencia</summary>
+            {!!job.assessment.hard_requirements?.length && (
+              <div>
+                <p>Posibles requisitos excluyentes (inferidos; revisar texto original)</p>
+                <ul>
+                  {job.assessment.hard_requirements.map((item, i) => (
+                    <li key={i}>{item.evidence}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <ul>
+              {job.assessment.reasons.map((reason, i) => (
+                <li key={i}>{reason}</li>
+              ))}
+            </ul>
+            <dl>
+              {Object.entries(job.assessment)
+                .filter(([key]) =>
+                  [
+                    'geography',
+                    'seniority',
+                    'language',
+                    'experience',
+                    'posting_language',
+                    'workplace',
+                  ].includes(key),
+                )
+                .map(([key, evidence]) => {
+                  const item = evidence as import('../types').Evidence;
+                  const labels: Record<string, string> = {
+                    geography: 'Geografía',
+                    seniority: 'Seniority',
+                    language: 'Idioma requerido',
+                    experience: 'Experiencia',
+                    posting_language: 'Idioma de publicación',
+                    workplace: 'Modalidad',
+                  };
+                  return (
+                    <div key={key}>
+                      <dt>{labels[key]}</dt>
+                      <dd>
+                        {item.value ?? 'Desconocido'} ·{' '}
+                        {
+                          (
+                            {
+                              confirmed: 'confirmado por la fuente',
+                              inferred: 'inferido',
+                              unknown: 'desconocido',
+                            } as Record<string, string>
+                          )[item.status]
+                        }
+                        {item.evidence && `: ${item.evidence}`}
+                      </dd>
+                    </div>
+                  );
+                })}
+            </dl>
+          </details>
+        )}
         <div className="tags">
           {job.required_skills.map((skill) => (
             <span key={skill}>{skill}</span>
